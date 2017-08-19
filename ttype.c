@@ -5,12 +5,15 @@
 #define W 1024
 #define H 768
 
+#define _C(x) ((x-32)*8)
+
+const int fps = 30;
+
 SDL_Surface  *surface  = NULL;
 SDL_Window   *window   = NULL;
 SDL_Renderer *renderer = NULL;
 SDL_Texture  *texture  = NULL;
 
-uint8_t pixels[W*H];
 uint8_t charSet[] = {
 #include "font.i"
 };
@@ -64,6 +67,7 @@ void renderChar(uint8_t *c, uint8_t *dest, int zoom)
 	int x,y;
 	uint8_t bits;
 
+	SDL_LockSurface(surface);
 	for(y=0; y<8; y++){
 		bits = c[y>>(zoom?1:0)];
 		for(x=0; x<8; x++){
@@ -92,7 +96,7 @@ void renderChar(uint8_t *c, uint8_t *dest, int zoom)
 			}
 		}
 	}
-	update();
+	SDL_UnlockSurface(surface);
 }
 
 
@@ -114,30 +118,69 @@ void writeLine(uint8_t *dest, char *s, int zoom)
 {
 	int offset = 0;
 	while(*s){
-		renderChar(&charSet[(*s++-32)*8], dest+offset, zoom);
+		renderChar(&charSet[_C(*s++)], dest+offset, zoom);
 		offset += 8<<(zoom>>1);
 	}
 }
 
 
-int main(void)
+void teletype(uint8_t *dest, char *s, int zoom, int p, int attrs)
 {
-	initialise_sdl();
-	SDL_LockSurface(surface);
+	uint8_t c;
+	int i  = 0, offset = 0;
+	int dz = 8<<(zoom>>1);
+	while(*s){
+		c = *s;
+		if(i>=p) break;
+		if(i+attrs>=p)
+			c ^= rand()&rand()&95;
+
+		renderChar(&charSet[_C(c)], dest+offset, zoom);
+		renderChar(&charSet[_C(' ')], dest+offset+dz, zoom);
+		offset += dz;
+		i++;
+		s++;
+	}
+	update();
+}
+
+
+void testCard(void)
+{
 	demoChars((uint8_t*)surface->pixels, 0);
 	demoChars((uint8_t*)surface->pixels+200*W, 1);
 	demoChars((uint8_t*)surface->pixels+400*W, 2);
 	writeLine((uint8_t*)surface->pixels+(H-120)*W+32, "Here is the text to be written by writeLine()\x7f", 0);
 	writeLine((uint8_t*)surface->pixels+(H-84)*W+32, "Here is the text to be written by writeLine()\x7f", 1);
 	writeLine((uint8_t*)surface->pixels+(H-48)*W+32, "Here is the text to be written by writeLine()\x7f", 2);
-	SDL_UnlockSurface(surface);
+	update();
+}
+
+
+int main(void)
+{
+	static unsigned int t = 0;
+	static unsigned int p = 0;
+	initialise_sdl();
+//	testCard();
+	update();
 
 	SDL_Event e;
 	for(;;){
 		SDL_PollEvent(&e);
 		if(e.type == SDL_KEYDOWN)
-			break;
-		SDL_Delay(100);
+			if(e.key.keysym.sym == SDLK_q)
+				break;
+
+		if(t<16*fps){
+			teletype((uint8_t*)surface->pixels+40*W+40, "This is the first message to be displayed by the teletype writer.", 0, p, 4);
+			teletype((uint8_t*)surface->pixels+56*W+40, "Here is another line rendered in a larger size.", 1, p, 4);
+			teletype((uint8_t*)surface->pixels+80*W+40, "\x7f \x80 Quad mode enabled! \x80 \x7f", 2, p, 4);
+			if(t>6*fps) p--; else p++;
+		}
+
+		SDL_Delay(1000.0/fps);
+		t++;
 	}
 
 	SDL_Quit();
