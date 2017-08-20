@@ -5,14 +5,14 @@
 #define W 1024
 #define H 768
 
-#define _C(x) ((x-32)*8)
+#define _C(x)	 ((x-32)*8)
+#define _SC(r,c) ((uint8_t*)surface->pixels+((r)*W)+(c))
 
 const int fps = 30;
 
 SDL_Surface  *surface  = NULL;
 SDL_Window   *window   = NULL;
 SDL_Renderer *renderer = NULL;
-//SDL_Texture  *texture  = NULL;
 
 uint8_t charSet[] = {
 #include "font.i"
@@ -27,16 +27,13 @@ void initialise_sdl(void)
 	window   = SDL_CreateWindow("Teletype", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, W, H, 0);
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 	surface  = SDL_CreateRGBSurface(0, W, H, 8, 0,0,0,0);
-//	texture  = SDL_CreateTextureFromSurface(renderer, surface);
-//	texture  = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_INDEX8, SDL_TEXTUREACCESS_STATIC, W, H);
-//	surface  = SDL_CreateRGBSurfaceWithFormat(0, W, H, 8, SDL_PIXELFORMAT_INDEX8);
-
-//	SDL_RenderSetLogicalSize(renderer, 640, 480);
 
 	SDL_Color bg = {0x2e, 0x1d, 0x70, 0xFF};
 	SDL_Color fg = {0xFF, 0xd2, 0x0a, 0xFF};
 	surface->format->palette->colors[0x00] = bg;
 	surface->format->palette->colors[0xFF] = fg;
+
+	SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, bg.a);
 }
 
 
@@ -44,13 +41,9 @@ void update(void)
 {
 	/* Meh. Pseudo indexed colour, fixed in 2.0.5? */
 	SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surface);
-//	SDL_UpdateTexture(texture, NULL, surface->pixels, W*sizeof(uint8_t));
 	SDL_RenderCopy(renderer, tex, NULL, NULL);
     SDL_RenderPresent(renderer);
 	SDL_DestroyTexture(tex);
-//	SDL_Surface *s = SDL_GetWindowSurface(window);
-//	SDL_BlitSurface(surface, NULL, s, NULL);
-//	SDL_UpdateWindowSurface(window);
 }
 
 
@@ -142,9 +135,9 @@ void testCard(void)
 	demoChars((uint8_t*)surface->pixels, 0);
 	demoChars((uint8_t*)surface->pixels+200*W, 1);
 	demoChars((uint8_t*)surface->pixels+400*W, 2);
-	writeLine((uint8_t*)surface->pixels+(H-120)*W+32, "Here is the text to be written by writeLine()\x7f", 0);
-	writeLine((uint8_t*)surface->pixels+(H-84)*W+32, "Here is the text to be written by writeLine()\x7f", 1);
-	writeLine((uint8_t*)surface->pixels+(H-48)*W+32, "Here is the text to be written by writeLine()\x7f", 2);
+	writeLine(_SC(H-120,32), "Here is the text to be written by writeLine()\x7f", 0);
+	writeLine(_SC(H-84,32), "Here is the text to be written by writeLine()\x7f", 1);
+	writeLine(_SC(H-48,32), "Here is the text to be written by writeLine()\x7f", 2);
 	update();
 }
 
@@ -154,7 +147,11 @@ int main(void)
 	static unsigned int t = 0;
 	static unsigned int p = 0;
 	initialise_sdl();
-	update();
+	testCard();
+	SDL_Delay(5000);
+	SDL_LockSurface(surface);
+	memset(surface->pixels, 0x00, W*H*sizeof(uint8_t));
+	SDL_UnlockSurface(surface);
 
 	SDL_Event e;
 	for(;;){
@@ -163,12 +160,17 @@ int main(void)
 			if(e.key.keysym.sym == SDLK_q)
 				break;
 
-		if(t<14*fps){
-			teletype((uint8_t*)surface->pixels+40*W+40, "This is the first message to be displayed by the teletype writer.", 0, p, 4);
-			teletype((uint8_t*)surface->pixels+60*W+40, "Here is another line rendered in a larger size.", 1, p, 4);
-			teletype((uint8_t*)surface->pixels+88*W+40, "\x7f \x80 Quad mode enabled! \x80 \x7f", 2, p, 4);
-			teletype((uint8_t*)surface->pixels+112*W+40, "Another line of text written in the largest size \x81\x82", 2, p, 4);
+		if(t<11*fps){
+			teletype(_SC(40,40), "This is the first message to be displayed by the teletype writer.", 0, p, 4);
+			teletype(_SC(60,40), "Here is another line rendered in a larger size.", 1, p, 4);
+			teletype(_SC(88,40), "\x7f \x80 Quad mode enabled! \x80 \x7f", 2, p, 4);
+			teletype(_SC(112,40), "Another line of text written in the largest size \x81\x82", 2, p, 4);
 			if(t>5*fps) p--; else p++;
+		}else if(t<21*fps){
+			teletype(_SC(40,40), "This set of messages is written later by the teletype writer.", 0, p, 4);
+			teletype(_SC(60,40), "In the same location as the earlier messages.", 0, p, 4);
+			teletype(_SC(H-64,W/2-180), "\x83 Sinclair Research 1982", 2, p, 4);
+			if(t>15*fps) p--; else p++;
 		}
 
 		SDL_Delay(1000.0/fps);
