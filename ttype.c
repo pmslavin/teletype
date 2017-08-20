@@ -12,7 +12,7 @@ const int fps = 30;
 SDL_Surface  *surface  = NULL;
 SDL_Window   *window   = NULL;
 SDL_Renderer *renderer = NULL;
-SDL_Texture  *texture  = NULL;
+//SDL_Texture  *texture  = NULL;
 
 uint8_t charSet[] = {
 #include "font.i"
@@ -26,33 +26,25 @@ void initialise_sdl(void)
 
 	window   = SDL_CreateWindow("Teletype", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, W, H, 0);
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-//	texture  = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_INDEX8, SDL_TEXTUREACCESS_STATIC, W, H);
 	surface  = SDL_CreateRGBSurface(0, W, H, 8, 0,0,0,0);
+//	texture  = SDL_CreateTextureFromSurface(renderer, surface);
+//	texture  = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_INDEX8, SDL_TEXTUREACCESS_STATIC, W, H);
 //	surface  = SDL_CreateRGBSurfaceWithFormat(0, W, H, 8, SDL_PIXELFORMAT_INDEX8);
-	texture  = SDL_CreateTextureFromSurface(renderer, surface);
 
+//	SDL_RenderSetLogicalSize(renderer, 640, 480);
 
 	SDL_Color bg = {0x2e, 0x1d, 0x70, 0xFF};
 	SDL_Color fg = {0xFF, 0xd2, 0x0a, 0xFF};
 	surface->format->palette->colors[0x00] = bg;
 	surface->format->palette->colors[0xFF] = fg;
-
-//	SDL_UpdateTexture(texture, NULL, surface->pixels, W*sizeof(uint8_t));
-//	SDL_RenderCopy(renderer, texture, NULL, NULL);
-//	SDL_RenderPresent(renderer);
 }
 
 
 void update(void)
 {
-/*
-	SDL_UpdateTexture(texture, NULL, surface->pixels, W*sizeof(uint8_t));
-    SDL_RenderCopy(renderer, texture, NULL, NULL);
-    SDL_RenderPresent(renderer);
-*/
-
-	/* Meh. Pseudo indexed colour */
+	/* Meh. Pseudo indexed colour, fixed in 2.0.5? */
 	SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surface);
+//	SDL_UpdateTexture(texture, NULL, surface->pixels, W*sizeof(uint8_t));
 	SDL_RenderCopy(renderer, tex, NULL, NULL);
     SDL_RenderPresent(renderer);
 	SDL_DestroyTexture(tex);
@@ -124,20 +116,20 @@ void writeLine(uint8_t *dest, char *s, int zoom)
 }
 
 
-void teletype(uint8_t *dest, char *s, int zoom, int p, int attrs)
+void teletype(uint8_t *dest, char *s, int zoom, int p, int fuzz)
 {
 	uint8_t c;
 	int i  = 0, offset = 0;
-	int dz = 8<<(zoom>>1);
 	while(*s){
 		c = *s;
-		if(i>=p) break;
-		if(i+attrs>=p)
-			c ^= rand()&rand()&95;
-
+		if(i>=p){
+			renderChar(&charSet[_C(' ')], dest+offset, zoom);
+			break;
+		}
+		if(i+fuzz>=p)
+			c ^= rand()&rand()&127;
 		renderChar(&charSet[_C(c)], dest+offset, zoom);
-		renderChar(&charSet[_C(' ')], dest+offset+dz, zoom);
-		offset += dz;
+		offset += 8<<(zoom>>1);
 		i++;
 		s++;
 	}
@@ -162,7 +154,6 @@ int main(void)
 	static unsigned int t = 0;
 	static unsigned int p = 0;
 	initialise_sdl();
-//	testCard();
 	update();
 
 	SDL_Event e;
@@ -172,11 +163,12 @@ int main(void)
 			if(e.key.keysym.sym == SDLK_q)
 				break;
 
-		if(t<16*fps){
+		if(t<14*fps){
 			teletype((uint8_t*)surface->pixels+40*W+40, "This is the first message to be displayed by the teletype writer.", 0, p, 4);
-			teletype((uint8_t*)surface->pixels+56*W+40, "Here is another line rendered in a larger size.", 1, p, 4);
-			teletype((uint8_t*)surface->pixels+80*W+40, "\x7f \x80 Quad mode enabled! \x80 \x7f", 2, p, 4);
-			if(t>6*fps) p--; else p++;
+			teletype((uint8_t*)surface->pixels+60*W+40, "Here is another line rendered in a larger size.", 1, p, 4);
+			teletype((uint8_t*)surface->pixels+88*W+40, "\x7f \x80 Quad mode enabled! \x80 \x7f", 2, p, 4);
+			teletype((uint8_t*)surface->pixels+112*W+40, "Another line of text written in the largest size \x81\x82", 2, p, 4);
+			if(t>5*fps) p--; else p++;
 		}
 
 		SDL_Delay(1000.0/fps);
