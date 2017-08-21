@@ -13,6 +13,8 @@ const int fps = 30;
 SDL_Surface  *surface  = NULL;
 SDL_Window   *window   = NULL;
 SDL_Renderer *renderer = NULL;
+SDL_Texture  *texture  = NULL;
+SDL_PixelFormat *tfmt  = NULL;
 
 uint8_t charSet[] = {
 #include "font.i"
@@ -22,28 +24,38 @@ uint8_t face[] = {60,90,219,255,129,66,60,0}; // Test glyph, 0x7F in font.i
 
 void initialise_sdl(void)
 {
-	SDL_Init(SDL_INIT_VIDEO);
+	SDL_Init(SDL_INIT_VIDEO|SDL_INIT_TIMER|SDL_INIT_EVENTS);
 
 	window   = SDL_CreateWindow("Teletype", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, W, H, 0);
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 	surface  = SDL_CreateRGBSurface(0, W, H, 8, 0,0,0,0);
 
-	SDL_Color bg = {0x2e, 0x1d, 0x70, 0xFF};
-	SDL_Color fg = {0xFF, 0xd2, 0x0a, 0xFF};
+	SDL_Color bg = {0x2c, 0x1d, 0x7c, 0xff};
+	SDL_Color fg = {0xf0, 0xb2, 0x0a, 0xff};
 	surface->format->palette->colors[0x00] = bg;
 	surface->format->palette->colors[0xFF] = fg;
 
 	SDL_SetRenderDrawColor(renderer, bg.r, bg.g, bg.b, bg.a);
+	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, W, H);
+	tfmt = SDL_AllocFormat(SDL_PIXELFORMAT_ARGB8888);
 }
 
 
 void update(void)
 {
-	/* Meh. Pseudo indexed colour, fixed in 2.0.5? */
-	SDL_Texture* tex = SDL_CreateTextureFromSurface(renderer, surface);
-	SDL_RenderCopy(renderer, tex, NULL, NULL);
+	/* Meh. Pseudo indexed colour */
+	/* SDL <=2.0.5 unable to create palettized texture: see src/render/SDL_render.c:423
+	 * Alternative is temp_tex = SDL_CreateTextureFromSurface() which adjusts format
+	 * to non-indexed, directly SDL_RenderCopy() temp_tex then destroy temp.
+	 * This is slower than SDL_ConvertSurface() with SDL_FreeSurface() as below.
+	 */
+
+	SDL_Surface *ts = SDL_ConvertSurface(surface, tfmt, 0);
+	SDL_UpdateTexture(texture, NULL, ts->pixels, ts->pitch);
+
+	SDL_RenderCopy(renderer, texture, NULL, NULL);
     SDL_RenderPresent(renderer);
-	SDL_DestroyTexture(tex);
+	SDL_FreeSurface(ts);
 }
 
 
@@ -146,31 +158,35 @@ int main(void)
 {
 	static unsigned int t = 0;
 	static unsigned int p = 0;
+	SDL_Event e;
+
 	initialise_sdl();
 	testCard();
-	SDL_Delay(5000);
+	while(SDL_WaitEvent(&e))
+		if(e.type == SDL_KEYDOWN)
+			break;
+
 	SDL_LockSurface(surface);
 	memset(surface->pixels, 0x00, W*H*sizeof(uint8_t));
 	SDL_UnlockSurface(surface);
 
-	SDL_Event e;
 	for(;;){
 		SDL_PollEvent(&e);
 		if(e.type == SDL_KEYDOWN)
 			if(e.key.keysym.sym == SDLK_q)
 				break;
 
-		if(t<11*fps){
+		if(t<9*fps){
 			teletype(_SC(40,40), "This is the first message to be displayed by the teletype writer.", 0, p, 4);
 			teletype(_SC(60,40), "Here is another line rendered in a larger size.", 1, p, 4);
 			teletype(_SC(88,40), "\x7f \x80 Quad mode enabled! \x80 \x7f", 2, p, 4);
 			teletype(_SC(112,40), "Another line of text written in the largest size \x81\x82", 2, p, 4);
-			if(t>5*fps) p--; else p++;
-		}else if(t<21*fps){
+			if(t>4*fps) p--; else p++;
+		}else if(t<20*fps){
 			teletype(_SC(40,40), "This set of messages is written later by the teletype writer.", 0, p, 4);
 			teletype(_SC(60,40), "In the same location as the earlier messages.", 0, p, 4);
 			teletype(_SC(H-64,W/2-180), "\x83 Sinclair Research 1982", 2, p, 4);
-			if(t>15*fps) p--; else p++;
+			if(t>14*fps) p--; else p++;
 		}
 
 		SDL_Delay(1000.0/fps);
