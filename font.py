@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
             Bitmap glyph-to-include codec
 
@@ -11,11 +10,11 @@
   ..####..                                   ..####..
   ........                                   ........
 """
+
 import sys
-from string import maketrans
 
 def font(src):
-    tr = maketrans(".#","01")
+    tr = str.maketrans(".#","01")
     char = []
     for i,r in enumerate(src.split(),1):
         char.append(str(int(r.translate(tr), 2)))
@@ -24,7 +23,7 @@ def font(src):
             char = []
 
 def defont(src):
-    tr = maketrans("01",".#")
+    tr = str.maketrans("01",".#")
     for char in src.split():
         for uint in char.split(',')[:-1]:
             b = bin(int(uint)).replace("0b","")

@@ -1,9 +1,9 @@
 TARGET   := ttype
 CC       := gcc
-CPP		 := g++
+CPP	 := g++
 CFLAGS   := -std=c99 -O2
 CPPFLAGS := -std=c++11 -O2
-WARN     := -Wall -Wextra -Wno-format -pedantic
+WARN     := -Wall -Wextra -Werror -Wno-format -pedantic
 # Libs required can be system-dependent; min is -lglut, max as below.
 LIBS    := -lSDL2
 OBJECTS := ttype.o
